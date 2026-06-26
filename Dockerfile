@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:1.96-bookworm AS builder
+FROM rust:1.96-trixie AS builder
 WORKDIR /app
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/app/target \
     cargo build --release && cp target/release/atlas-transaction-decoder /usr/local/bin/atlas-transaction-decoder
 
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
