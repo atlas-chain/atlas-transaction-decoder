@@ -1,0 +1,19 @@
+services:
+  transaction-decoder:
+    build: .
+    image: atlas-transaction-decoder
+    container_name: atlas-transaction-decoder
+    ports:
+      - "28884:28884"
+    environment:
+      LISTEN_HOST: "0.0.0.0"
+      LISTEN_PORT: "28884"
+      HTML_TITLE: ${HTML_TITLE:-Atlas Transaction Decoder}
+      MAX_INPUT_BYTES: ${MAX_INPUT_BYTES:-2097152}
+      # Default chain id used when a request omits chainId. The Arkiv dev chain
+      # (1337) additionally trusts the deterministic local provider signer.
+      DEFAULT_CHAIN_ID: ${DEFAULT_CHAIN_ID:-1337}
+      # Optional comma-separated 0x addresses added to the trusted
+      # payload-provider signer allowlist used for reference verification:
+      TRUSTED_PROVIDER_SIGNERS: ${TRUSTED_PROVIDER_SIGNERS:-}
+    restart: unless-stopped

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__HTML_TITLE__</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #101214;
+        --panel: #181c1f;
+        --field: #0c0f10;
+        --border: #344044;
+        --text: #edf2f0;
+        --muted: #a9b4b0;
+        --accent: #4ec38a;
+        --accent-ink: #07110c;
+        --warn: #e4b04a;
+        --bad: #f06b5f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        padding: 2rem 1rem;
+        line-height: 1.5;
+      }
+      .wrap { max-width: 1080px; margin: 0 auto; }
+      h1 { margin: 0 0 0.4rem; font-size: clamp(1.8rem, 4vw, 3rem); }
+      h2 { margin: 2rem 0 0.75rem; font-size: 1rem; color: var(--muted); text-transform: uppercase; }
+      .meta { color: var(--muted); display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; }
+      .meta b { color: var(--text); }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+      label { display: block; color: var(--muted); font-size: 0.82rem; margin-bottom: 0.25rem; }
+      input, textarea {
+        width: 100%;
+        color: var(--text);
+        background: var(--field);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.6rem;
+        font: inherit;
+      }
+      textarea { min-height: 160px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+      input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+      button {
+        cursor: pointer;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 700;
+        padding: 0.6rem 1rem;
+        border-radius: 6px;
+      }
+      button.secondary { background: transparent; color: var(--text); border-color: var(--border); }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      code { background: var(--field); padding: 0.12rem 0.35rem; border-radius: 4px; overflow-wrap: anywhere; }
+      pre { background: var(--field); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; overflow-x: auto; }
+      a { color: var(--accent); }
+      .row { display: grid; gap: 0.75rem; }
+      .grid2 { display: grid; grid-template-columns: 1fr 160px; gap: 0.75rem; align-items: end; }
+      .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: center; margin-top: 0.9rem; }
+      .hint { color: var(--muted); font-size: 0.82rem; }
+      .pill { display: inline-block; padding: 0.1rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; font-size: 0.75rem; }
+      .pill.ok { border-color: var(--accent); color: var(--accent); }
+      .pill.bad { border-color: var(--bad); color: var(--bad); }
+      .pill.warn { border-color: var(--warn); color: var(--warn); }
+      .op { border: 1px solid var(--border); border-radius: 8px; padding: 0.9rem; margin-top: 0.8rem; }
+      .op h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+      .kv { display: grid; grid-template-columns: 160px 1fr; gap: 0.3rem 0.8rem; font-size: 0.9rem; }
+      .kv div:nth-child(odd) { color: var(--muted); }
+      .msg { margin-top: 1rem; padding: 0.75rem 0.9rem; border-radius: 6px; border: 1px solid var(--border); overflow-wrap: anywhere; }
+      .msg.err { border-color: var(--bad); color: var(--bad); }
+      @media (max-width: 720px) {
+        body { padding: 1rem; }
+        .grid2 { grid-template-columns: 1fr; }
+        .kv { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>__HTML_TITLE__</h1>
+      <div class="meta" id="meta">loading status...</div>
+
+      <h2>Decode an Arkiv Transaction</h2>
+      <div class="card">
+        <form id="decodeForm" class="row">
+          <div>
+            <label for="data">execute() calldata or signed transaction hex</label>
+            <textarea id="data" name="data" spellcheck="false" placeholder="0x..." required></textarea>
+          </div>
+          <div class="grid2">
+            <div class="hint">
+              Create / update payloads carry a signed payload reference; the verdict below mirrors
+              the on-chain precompile.
+            </div>
+            <div>
+              <label for="chainId">chainId</label>
+              <input id="chainId" name="chainId" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="actions">
+            <button id="decodeBtn" type="submit">Decode</button>
+            <button id="clearBtn" class="secondary" type="button">Clear</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="msg err" id="msg" hidden></div>
+
+      <h2 id="resultsTitle" hidden>Operations</h2>
+      <div id="results"></div>
+      <h2 id="rawTitle" hidden>Raw response</h2>
+      <pre id="raw" hidden></pre>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      function showError(text) {
+        $("msg").textContent = text;
+        $("msg").hidden = false;
+      }
+      function clearError() { $("msg").hidden = true; }
+
+      function esc(value) {
+        return String(value)
+          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+
+      async function refresh() {
+        try {
+          const res = await fetch("/status", { cache: "no-store" });
+          const status = await res.json();
+          if (!$("chainId").value) $("chainId").value = status.defaultChainId;
+          $("meta").innerHTML =
+            "<span><b>registry:</b> <code>" + esc(status.arkivAddress) + "</code></span>" +
+            "<span><b>default chainId:</b> " + esc(status.defaultChainId) + "</span>" +
+            "<span><b>trusted signer:</b> <code>" + esc(status.trustedProviderSigners.default) + "</code></span>";
+        } catch (e) {
+          $("meta").textContent = "status unavailable";
+        }
+      }
+
+      function renderAttributes(attributes) {
+        if (!attributes || !attributes.length) return "<span class=\"hint\">none</span>";
+        return attributes.map((a) =>
+          "<div><code>" + esc(a.key) + "</code> = " + esc(a.value) +
+          " <span class=\"hint\">(" + esc(a.valueTypeName) + ")</span></div>").join("");
+      }
+
+      function renderReference(op) {
+        if (op.referenceError) {
+          return "<div class=\"kv\"><div>payload reference</div><div><span class=\"pill bad\">malformed</span> " +
+            esc(op.referenceError) + "</div></div>";
+        }
+        const ref = op.payloadReference;
+        if (!ref) return "";
+        const v = op.referenceVerification || {};
+        const verdict = v.valid
+          ? "<span class=\"pill ok\">verified</span>"
+          : "<span class=\"pill bad\">not verified</span>";
+        const trust = v.signerTrusted
+          ? "<span class=\"pill ok\">signer trusted</span>"
+          : "<span class=\"pill warn\">signer not trusted</span>";
+        const errors = (v.errors && v.errors.length)
+          ? "<div><div>errors</div><div>" + v.errors.map(esc).join("<br>") + "</div></div>"
+          : "";
+        return "<div class=\"kv\">" +
+          "<div>payload reference</div><div>" + verdict + " " + trust + "</div>" +
+          "<div>provider id</div><div><code>" + esc(ref.id) + "</code></div>" +
+          "<div>namespace</div><div>" + esc(ref.namespace) + "</div>" +
+          "<div>content type</div><div>" + esc(ref.contentType || "—") + "</div>" +
+          "<div>checksum</div><div><code>" + esc(ref.checksum) + "</code></div>" +
+          "<div>size</div><div>" + esc(ref.sizeBytes) + " bytes</div>" +
+          "<div>recovered signer</div><div><code>" + esc(v.recoveredSigner || "—") + "</code></div>" +
+          errors +
+          "</div>";
+      }
+
+      function renderOperation(op) {
+        const payload = op.payload.isReference
+          ? "<span class=\"pill\">reference</span>"
+          : (op.payload.text != null
+              ? esc(op.payload.text)
+              : "<code>" + esc(op.payload.hex.slice(0, 42)) + (op.payload.hex.length > 42 ? "…" : "") + "</code>") +
+            " <span class=\"hint\">(" + op.payload.size + " bytes)</span>";
+        return "<div class=\"op\">" +
+          "<h3>#" + op.index + " · " + esc(op.operation) + "</h3>" +
+          "<div class=\"kv\">" +
+          "<div>entity key</div><div><code>" + esc(op.entityKey) + "</code></div>" +
+          "<div>content type</div><div>" + esc(op.contentType || "—") + "</div>" +
+          "<div>payload</div><div>" + payload + "</div>" +
+          "<div>attributes</div><div>" + renderAttributes(op.attributes) + "</div>" +
+          "<div>expires (blocks)</div><div>" + op.expiresAtBlocks + " <span class=\"hint\">≈ " + op.approxExpiresInSeconds + "s</span></div>" +
+          (op.newOwner ? "<div>new owner</div><div><code>" + esc(op.newOwner) + "</code></div>" : "") +
+          "</div>" +
+          renderReference(op) +
+          "</div>";
+      }
+
+      async function decode(event) {
+        event.preventDefault();
+        clearError();
+        $("decodeBtn").disabled = true;
+        $("results").innerHTML = "";
+        try {
+          const body = { data: $("data").value.trim() };
+          const chainId = $("chainId").value.trim();
+          if (chainId) body.chainId = Number(chainId);
+          const res = await fetch("/decode", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.ok) {
+            throw new Error(json.error && json.error.message ? json.error.message : "HTTP " + res.status);
+          }
+          const header = (json.to ? "<span class=\"pill\">to " + esc(json.to) + "</span> " : "") +
+            (json.warning ? "<span class=\"pill warn\">" + esc(json.warning) + "</span>" : "");
+          $("resultsTitle").hidden = false;
+          $("results").innerHTML =
+            "<div class=\"hint\">" + json.operationCount + " operation(s) · chainId " + esc(json.chainId) + "</div>" +
+            (header ? "<div style=\"margin:0.5rem 0\">" + header + "</div>" : "") +
+            json.operations.map(renderOperation).join("");
+          $("rawTitle").hidden = false;
+          $("raw").hidden = false;
+          $("raw").textContent = JSON.stringify(json, null, 2);
+        } catch (error) {
+          showError(error.message);
+        } finally {
+          $("decodeBtn").disabled = false;
+        }
+      }
+
+      $("decodeForm").addEventListener("submit", decode);
+      $("clearBtn").addEventListener("click", () => {
+        $("data").value = "";
+        $("results").innerHTML = "";
+        $("resultsTitle").hidden = true;
+        $("rawTitle").hidden = true;
+        $("raw").hidden = true;
+        clearError();
+      });
+      refresh();
+    </script>
+  </body>
+</html>
