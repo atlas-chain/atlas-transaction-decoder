@@ -25,6 +25,10 @@ pub struct Config {
     pub max_input_bytes: NonZeroUsize,
     #[serde(default = "default_chain_id")]
     pub default_chain_id: u64,
+    /// Optional JSON-RPC endpoint exposed to the browser UI for
+    /// eth_getTransactionByHash lookups. The decoder backend never calls it.
+    #[serde(default)]
+    pub rpc_url: Option<String>,
     /// Optional comma-separated 0x-addresses added to the trusted
     /// payload-provider signer allowlist used for reference verification.
     #[serde(default)]
@@ -80,6 +84,7 @@ mod tests {
         assert_eq!(config.html_title, DEFAULT_HTML_TITLE);
         assert_eq!(config.max_input_bytes, DEFAULT_MAX_INPUT_BYTES);
         assert_eq!(config.default_chain_id, DEFAULT_CHAIN_ID);
+        assert_eq!(config.rpc_url, None);
         assert_eq!(config.trusted_provider_signers, None);
     }
 
@@ -90,6 +95,7 @@ mod tests {
             ("HTML_TITLE", "Decoder"),
             ("MAX_INPUT_BYTES", "4096"),
             ("DEFAULT_CHAIN_ID", "42069"),
+            ("RPC_URL", "https://rpc.atlas.arkiv-global.net"),
             ("TRUSTED_PROVIDER_SIGNERS", "0xabc,0xdef"),
         ])
         .unwrap();
@@ -97,6 +103,10 @@ mod tests {
         assert_eq!(config.html_title, "Decoder");
         assert_eq!(config.max_input_bytes.get(), 4096);
         assert_eq!(config.default_chain_id, 42069);
+        assert_eq!(
+            config.rpc_url.as_deref(),
+            Some("https://rpc.atlas.arkiv-global.net")
+        );
         assert_eq!(
             config.trusted_provider_signers.as_deref(),
             Some("0xabc,0xdef")

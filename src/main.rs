@@ -36,6 +36,7 @@ fn main() {
             "message": "starting atlas transaction decoder",
             "defaultChainId": config.default_chain_id,
             "maxInputBytes": config.max_input_bytes.get(),
+            "rpcConfigured": config.rpc_url.as_deref().is_some_and(|url| !url.trim().is_empty()),
             "extraTrustedSigners": extra_trusted.len(),
         })
     );
@@ -53,6 +54,7 @@ fn main() {
             html_title: Arc::new(config.html_title.clone()),
             max_input_bytes: config.max_input_bytes.get(),
             default_chain_id: config.default_chain_id,
+            rpc_url: Arc::new(config.rpc_url.clone().filter(|url| !url.trim().is_empty())),
             extra_trusted: Arc::new(extra_trusted),
         };
 

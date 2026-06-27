@@ -18,7 +18,8 @@ ENV LISTEN_HOST=0.0.0.0 \
     LISTEN_PORT=28884 \
     HTML_TITLE="Atlas Transaction Decoder" \
     MAX_INPUT_BYTES=2097152 \
-    DEFAULT_CHAIN_ID=1337
+    DEFAULT_CHAIN_ID=1337 \
+    RPC_URL=""
 
 EXPOSE 28884
 ENTRYPOINT ["atlas-transaction-decoder"]

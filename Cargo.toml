@@ -1,6 +1,6 @@
 [package]
 name = "atlas-transaction-decoder"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Arkiv transaction decoder service for the Atlas Network."
 repository = "https://github.com/atlas-chain/atlas-transaction-decoder"

@@ -20,13 +20,21 @@ use crate::reference::{
 };
 
 const SERVICE_NAME: &str = "atlas-transaction-decoder";
-const ENDPOINTS: [&str; 5] = ["/", "/status", "/healthz", "/decode", "/decode?data=0x..."];
+const ENDPOINTS: [&str; 6] = [
+    "/",
+    "/?tx=0x...",
+    "/status",
+    "/healthz",
+    "/decode",
+    "/decode?data=0x...",
+];
 
 #[derive(Clone)]
 pub struct AppState {
     pub html_title: Arc<String>,
     pub max_input_bytes: usize,
     pub default_chain_id: u64,
+    pub rpc_url: Arc<Option<String>>,
     pub extra_trusted: Arc<Vec<Address>>,
 }
 
@@ -62,6 +70,7 @@ pub async fn run_server(state: AppState, listen_host: String, listen_port: u16) 
             "url": format!("http://{bind_address}/decode"),
             "ui": format!("http://{bind_address}/"),
             "defaultChainId": state.default_chain_id,
+            "rpcConfigured": state.rpc_url.is_some(),
             "extraTrustedSigners": state.extra_trusted.len(),
             "endpoints": ENDPOINTS,
         })
@@ -106,6 +115,7 @@ async fn status_handler(State(state): State<AppState>) -> Json<Value> {
         "arkivAddress": ARKIV_ADDRESS,
         "defaultChainId": state.default_chain_id,
         "maxInputBytes": state.max_input_bytes,
+        "rpcUrl": state.rpc_url.as_deref(),
         "payloadReferenceContentType": PAYLOAD_REFERENCE_CONTENT_TYPE,
         "trustedProviderSigners": {
             "default": TRUSTED_PROVIDER_SIGNER,
@@ -253,6 +263,7 @@ mod tests {
             html_title: Arc::new("Atlas Transaction Decoder".to_string()),
             max_input_bytes: 1024 * 1024,
             default_chain_id: DEV_CHAIN_ID,
+            rpc_url: Arc::new(Some("https://rpc.example".to_string())),
             extra_trusted: Arc::new(Vec::new()),
         }
     }
@@ -262,7 +273,10 @@ mod tests {
         let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("body bytes");
-        (status, String::from_utf8(bytes.to_vec()).expect("utf8 body"))
+        (
+            status,
+            String::from_utf8(bytes.to_vec()).expect("utf8 body"),
+        )
     }
 
     #[tokio::test]
@@ -275,8 +289,21 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn status_reports_configured_rpc_url() {
+        let Json(status) = status_handler(State(state())).await;
+        assert_eq!(status["rpcUrl"], "https://rpc.example");
+    }
+
+    #[tokio::test]
     async fn decode_get_requires_data() {
-        let response = decode_get(State(state()), Query(DecodeQuery { data: None, chain_id: None })).await;
+        let response = decode_get(
+            State(state()),
+            Query(DecodeQuery {
+                data: None,
+                chain_id: None,
+            }),
+        )
+        .await;
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 

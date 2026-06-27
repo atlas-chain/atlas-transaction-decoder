@@ -61,6 +61,7 @@
       a { color: var(--accent); }
       .row { display: grid; gap: 0.75rem; }
       .grid2 { display: grid; grid-template-columns: 1fr 160px; gap: 0.75rem; align-items: end; }
+      .gridTx { display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: end; }
       .actions { display: flex; flex-wrap: wrap; gap: 0.7rem; align-items: center; margin-top: 0.9rem; }
       .hint { color: var(--muted); font-size: 0.82rem; }
       .pill { display: inline-block; padding: 0.1rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; font-size: 0.75rem; }
@@ -76,6 +77,7 @@
       @media (max-width: 720px) {
         body { padding: 1rem; }
         .grid2 { grid-template-columns: 1fr; }
+        .gridTx { grid-template-columns: 1fr; }
         .kv { grid-template-columns: 1fr; }
       }
     </style>
@@ -88,6 +90,13 @@
       <h2>Decode an Arkiv Transaction</h2>
       <div class="card">
         <form id="decodeForm" class="row">
+          <div class="gridTx">
+            <div>
+              <label for="txHash">transaction hash from configured RPC</label>
+              <input id="txHash" name="txHash" spellcheck="false" placeholder="0x..." />
+            </div>
+            <button id="loadTxBtn" class="secondary" type="button">Load tx</button>
+          </div>
           <div>
             <label for="data">execute() calldata or signed transaction hex</label>
             <textarea id="data" name="data" spellcheck="false" placeholder="0x..." required></textarea>
@@ -104,6 +113,7 @@
           </div>
           <div class="actions">
             <button id="decodeBtn" type="submit">Decode</button>
+            <button id="permalinkBtn" class="secondary" type="button">Copy tx link</button>
             <button id="clearBtn" class="secondary" type="button">Clear</button>
           </div>
         </form>
@@ -119,6 +129,7 @@
 
     <script>
       const $ = (id) => document.getElementById(id);
+      let rpcUrl = null;
 
       function showError(text) {
         $("msg").textContent = text;
@@ -136,13 +147,82 @@
         try {
           const res = await fetch("/status", { cache: "no-store" });
           const status = await res.json();
+          rpcUrl = status.rpcUrl || null;
           if (!$("chainId").value) $("chainId").value = status.defaultChainId;
           $("meta").innerHTML =
             "<span><b>registry:</b> <code>" + esc(status.arkivAddress) + "</code></span>" +
             "<span><b>default chainId:</b> " + esc(status.defaultChainId) + "</span>" +
+            "<span><b>rpc:</b> " + (rpcUrl ? "<code>" + esc(rpcUrl) + "</code>" : "not configured") + "</span>" +
             "<span><b>trusted signer:</b> <code>" + esc(status.trustedProviderSigners.default) + "</code></span>";
         } catch (e) {
           $("meta").textContent = "status unavailable";
+        }
+      }
+
+      function normalizeHash(value) {
+        const hash = value.trim();
+        if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
+          throw new Error("transaction hash must be 0x-prefixed 32-byte hex");
+        }
+        return hash;
+      }
+
+      async function rpcCall(method, params) {
+        if (!rpcUrl) throw new Error("RPC_URL is not configured for this decoder UI");
+        const res = await fetch(rpcUrl, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: Date.now(), method, params }),
+        });
+        const json = await res.json();
+        if (!res.ok || json.error) {
+          throw new Error(json.error && json.error.message ? json.error.message : "RPC HTTP " + res.status);
+        }
+        return json.result;
+      }
+
+      function parseRpcChainId(value) {
+        if (typeof value === "string" && /^0x[0-9a-fA-F]+$/.test(value)) {
+          return String(parseInt(value, 16));
+        }
+        if (typeof value === "number" && Number.isSafeInteger(value)) {
+          return String(value);
+        }
+        return "";
+      }
+
+      async function loadTransaction(autoDecode) {
+        clearError();
+        const hash = normalizeHash($("txHash").value);
+        $("loadTxBtn").disabled = true;
+        try {
+          const tx = await rpcCall("eth_getTransactionByHash", [hash]);
+          if (!tx) throw new Error("transaction not found on configured RPC");
+          const input = tx.input || tx.data;
+          if (!input || input === "0x") throw new Error("transaction has no calldata to decode");
+          $("data").value = input;
+          const chainId = parseRpcChainId(tx.chainId);
+          if (chainId) $("chainId").value = chainId;
+          const url = new URL(window.location.href);
+          url.searchParams.set("tx", hash);
+          window.history.replaceState({}, "", url);
+          if (autoDecode) {
+            await decode();
+          }
+        } finally {
+          $("loadTxBtn").disabled = false;
+        }
+      }
+
+      async function copyPermalink() {
+        try {
+          const hash = normalizeHash($("txHash").value);
+          const url = new URL(window.location.href);
+          url.search = "";
+          url.searchParams.set("tx", hash);
+          await navigator.clipboard.writeText(url.toString());
+        } catch (error) {
+          showError(error.message);
         }
       }
 
@@ -204,7 +284,7 @@
       }
 
       async function decode(event) {
-        event.preventDefault();
+        if (event) event.preventDefault();
         clearError();
         $("decodeBtn").disabled = true;
         $("results").innerHTML = "";
@@ -239,7 +319,16 @@
       }
 
       $("decodeForm").addEventListener("submit", decode);
+      $("loadTxBtn").addEventListener("click", async () => {
+        try {
+          await loadTransaction(true);
+        } catch (error) {
+          showError(error.message);
+        }
+      });
+      $("permalinkBtn").addEventListener("click", copyPermalink);
       $("clearBtn").addEventListener("click", () => {
+        $("txHash").value = "";
         $("data").value = "";
         $("results").innerHTML = "";
         $("resultsTitle").hidden = true;
@@ -247,7 +336,17 @@
         $("raw").hidden = true;
         clearError();
       });
-      refresh();
+      refresh().then(async () => {
+        const tx = new URLSearchParams(window.location.search).get("tx");
+        if (tx) {
+          $("txHash").value = tx;
+          try {
+            await loadTransaction(true);
+          } catch (error) {
+            showError(error.message);
+          }
+        }
+      });
     </script>
   </body>
 </html>

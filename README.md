@@ -68,6 +68,7 @@ Configuration is read from environment variables.
 | `HTML_TITLE` | `Atlas Transaction Decoder` | Browser UI title. |
 | `MAX_INPUT_BYTES` | `2097152` | Maximum accepted input size. |
 | `DEFAULT_CHAIN_ID` | `1337` | Chain id used when a request omits `chainId`. |
+| `RPC_URL` | unset | Optional JSON-RPC endpoint exposed to the browser UI for transaction-hash lookup. |
 | `TRUSTED_PROVIDER_SIGNERS` | unset | Comma-separated 0x addresses added to the trusted signer allowlist. |
 
 ### Trusted signers
@@ -78,6 +79,21 @@ deterministic local dev signer `0x7e5f4552091a69125d5dfcb7b8c2659029395bdf`
 only on chain `1337`. `TRUSTED_PROVIDER_SIGNERS` adds more. `chainId` (per
 request or `DEFAULT_CHAIN_ID`) selects whether the dev signer is trusted; it
 does not affect verification of the production signer.
+
+### Transaction hash lookup
+
+Set `RPC_URL` to let the browser UI load a specific transaction with
+`eth_getTransactionByHash`. The backend never calls JSON-RPC or proxies RPC
+traffic; the browser fetches the transaction, copies its `input` calldata into
+the form, and then submits that calldata to `/decode`.
+
+Permalinks can open the UI with a transaction hash preloaded:
+
+```text
+http://127.0.0.1:28884/?tx=0x9687de6f57b39fbf3cccd7cd37115ccb41f0fc2e1bd6873cfb68b7539a610d17
+```
+
+The configured RPC endpoint must allow browser CORS requests.
 
 ## API
 
@@ -90,7 +106,7 @@ does not affect verification of the production signer.
 ### `GET /status`
 
 Service configuration, the Arkiv registry address, the reference content type,
-and the trusted-signer allowlist.
+the optional UI `rpcUrl`, and the trusted-signer allowlist.
 
 ### `POST /decode`
 

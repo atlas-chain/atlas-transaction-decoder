@@ -13,6 +13,9 @@ services:
       # Default chain id used when a request omits chainId. The Arkiv dev chain
       # (1337) additionally trusts the deterministic local provider signer.
       DEFAULT_CHAIN_ID: ${DEFAULT_CHAIN_ID:-1337}
+      # Optional browser-side JSON-RPC endpoint for loading transactions by hash.
+      # The decoder backend never calls this URL.
+      RPC_URL: ${RPC_URL:-}
       # Optional comma-separated 0x addresses added to the trusted
       # payload-provider signer allowlist used for reference verification:
       TRUSTED_PROVIDER_SIGNERS: ${TRUSTED_PROVIDER_SIGNERS:-}

@@ -20,6 +20,7 @@ LISTEN_PORT=28884
 HTML_TITLE="Atlas Transaction Decoder"
 MAX_INPUT_BYTES=2097152
 DEFAULT_CHAIN_ID=1337
+RPC_URL=
 TRUSTED_PROVIDER_SIGNERS=
 ```
 
@@ -30,6 +31,12 @@ affects whether the dev-chain provider signer
 `DEFAULT_CHAIN_ID=42069` for the public Atlas chain, or leave it at `1337` for
 local dev chains. Add operator-controlled signers with
 `TRUSTED_PROVIDER_SIGNERS` (comma-separated 0x addresses).
+
+`RPC_URL` is optional and is only exposed to the browser UI. The decoder backend
+does not call JSON-RPC. When set, the UI can load a transaction by hash with
+`eth_getTransactionByHash`, copy its `input` calldata into the decode form, and
+decode that calldata through the normal `/decode` endpoint. Use an RPC endpoint
+that allows browser CORS requests.
 
 ## API Shape
 
@@ -47,6 +54,12 @@ mirrors the POST. Health and configuration:
 ```text
 GET /healthz
 GET /status
+```
+
+Browser permalink for loading a transaction hash from the configured RPC:
+
+```text
+GET /?tx=0x9687de6f57b39fbf3cccd7cd37115ccb41f0fc2e1bd6873cfb68b7539a610d17
 ```
 
 ## How reference verification works
@@ -81,6 +94,7 @@ services:
       HTML_TITLE: "Atlas Transaction Decoder"
       MAX_INPUT_BYTES: "2097152"
       DEFAULT_CHAIN_ID: "1337"
+      RPC_URL: "https://rpc.atlas.arkiv-global.net"
       TRUSTED_PROVIDER_SIGNERS: ""
     restart: unless-stopped
 ```
